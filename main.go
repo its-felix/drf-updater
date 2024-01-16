@@ -8,18 +8,34 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 )
 
 const (
 	drfURL = "https://update.drf.rs/drf.dll"
-	dest   = "/Users/felix/Downloads/drf.dll"
+	dest   = `C:\Program Files (x86)\Steam\steamapps\common\Guild Wars 2\addons\arcdps\drf.dll`
 )
 
 func main() {
+	err := run()
+	if err != nil {
+		log.Println(err)
+	}
+
+	for i := 0; i < 3; i++ {
+		print(".")
+		time.Sleep(time.Second)
+	}
+
+	if err != nil {
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	fTemp, err := os.CreateTemp("", "drf_*.dll")
 	if err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
 
 	defer func() {
@@ -29,19 +45,16 @@ func main() {
 
 	res, err := http.Get(drfURL)
 	if err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
 
 	if res.StatusCode != http.StatusOK {
-		log.Fatal("status != 200")
-		return
+		return errors.New("status != 200")
 	}
 
 	defer res.Body.Close()
 	if _, err = io.Copy(fTemp, res.Body); err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
 
 	existingHash, err := sha256File(dest)
@@ -49,30 +62,28 @@ func main() {
 
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		if notExists = errors.Is(err, os.ErrNotExist); !notExists {
-			log.Fatal(err)
-			return
+			return err
 		}
 	}
 
 	if !notExists {
 		newHash, err := sha256File(fTemp.Name())
 		if err != nil {
-			log.Fatal(err)
-			return
+			return err
 		}
 
 		if bytes.Equal(existingHash, newHash) {
 			log.Println("is up to date")
-			return
+			return nil
 		}
 	}
 
 	if err = copyFile(fTemp.Name(), dest); err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
 
 	log.Println("updated")
+	return nil
 }
 
 func sha256File(name string) ([]byte, error) {
